@@ -1,0 +1,53 @@
+<?php
+
+declare(strict_types=1);
+
+namespace MiGears\Domain;
+
+/**
+ * Provides array-to-object and object-to-array conversion.
+ *
+ * Domain classes use this trait to gain fromArray() and toArray()
+ * without any base class inheritance or external hydrator.
+ *
+ *   class UserDomain
+ *   {
+ *       use DataAccess;
+ *
+ *       public function __construct(
+ *           public readonly int $id,
+ *           public readonly string $user_name,
+ *           public readonly string $email,
+ *       ) {}
+ *   }
+ *
+ *   $user = UserDomain::fromArray($row);   // array → Domain
+ *   $row = $user->toArray();               // Domain → array
+ */
+trait DataAccess
+{
+    /**
+     * Creates a Domain instance from a database row (associative array).
+     *
+     * Uses PHP 8.x named arguments via array spreading, so column names
+     * must match constructor parameter names exactly.
+     *
+     * @param array<string, mixed> $row
+     */
+    public static function fromArray(array $row): static
+    {
+        return new static(...$row);
+    }
+
+    /**
+     * Converts the Domain instance to an associative array.
+     *
+     * Property names match database column names 1:1 (no camelCase conversion).
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        return get_object_vars($this);
+    }
+}
