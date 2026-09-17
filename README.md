@@ -98,6 +98,80 @@ PDO / MySQL
 - DAO uses `fromArray()` to convert SQL results into Domain objects
 - DAO uses `toArray()` to convert Domain objects back to arrays for SQL
 
+## Self-Validation with Validatable
+
+Domain objects can validate their own data using the `Validatable` trait. Validation rules are defined in the domain class itself, and errors are returned as structured error codes + params (i18n-ready).
+
+Depends on `migears/validator`.
+
+```php
+use MiGears\Domain\DataAccess;
+use MiGears\Domain\Validatable;
+
+class UserDomain
+{
+    use DataAccess;
+    use Validatable;
+
+    public function __construct(
+        public readonly string $username,
+        public readonly string $email,
+        public readonly int $age = 0,
+    ) {}
+
+    protected static function validationRules(): array
+    {
+        return [
+            'username' => ['required' => true, 'minLength' => 3, 'maxLength' => 20],
+            'email'    => ['required' => true, 'email' => true],
+            'age'      => ['integer' => true, 'min' => 0, 'max' => 150],
+        ];
+    }
+}
+```
+
+### Validate an instance
+
+```php
+$user = new UserDomain('ab', 'invalid', -1);
+
+$errors = $user->validate();
+// [
+//   'username' => ['rule' => 'minLength', 'params' => ['min' => 3]],
+//   'email'    => ['rule' => 'email', 'params' => []],
+//   'age'      => ['rule' => 'min', 'params' => ['min' => 0]],
+// ]
+
+$user->isValid(); // false
+```
+
+### Validate before construction
+
+```php
+$errors = UserDomain::validateArray($_POST);
+
+if ($errors === []) {
+    $user = UserDomain::fromArray($_POST);
+}
+```
+
+### Error format
+
+Errors use structured codes instead of hardcoded messages, ready for i18n:
+
+```php
+['field' => ['rule' => 'minLength', 'params' => ['min' => 3]]]
+```
+
+Pair with `migears/i18n` to translate:
+
+```php
+$message = $translator->get(
+    "validation.{$error['rule']}",
+    ['field' => $fieldLabel, ...$error['params']]
+);
+```
+
 ## Why a Trait Instead of a Base Class?
 
 1. **No inheritance constraint** — Domain classes can extend whatever they need
@@ -209,6 +283,80 @@ PDO / MySQL
 - Domain 不知道 SQL 和 DAO 的存在
 - DAO 用 `fromArray()` 把 SQL 结果转为 Domain 对象
 - DAO 用 `toArray()` 把 Domain 对象转回数组供 SQL 使用
+
+## Validatable 自验证
+
+Domain 对象可以使用 `Validatable` trait 自验证数据。验证规则定义在 domain 类自身，错误以结构化的错误码 + 参数形式返回（i18n 就绪）。
+
+依赖 `migears/validator`。
+
+```php
+use MiGears\Domain\DataAccess;
+use MiGears\Domain\Validatable;
+
+class UserDomain
+{
+    use DataAccess;
+    use Validatable;
+
+    public function __construct(
+        public readonly string $username,
+        public readonly string $email,
+        public readonly int $age = 0,
+    ) {}
+
+    protected static function validationRules(): array
+    {
+        return [
+            'username' => ['required' => true, 'minLength' => 3, 'maxLength' => 20],
+            'email'    => ['required' => true, 'email' => true],
+            'age'      => ['integer' => true, 'min' => 0, 'max' => 150],
+        ];
+    }
+}
+```
+
+### 验证实例
+
+```php
+$user = new UserDomain('ab', 'invalid', -1);
+
+$errors = $user->validate();
+// [
+//   'username' => ['rule' => 'minLength', 'params' => ['min' => 3]],
+//   'email'    => ['rule' => 'email', 'params' => []],
+//   'age'      => ['rule' => 'min', 'params' => ['min' => 0]],
+// ]
+
+$user->isValid(); // false
+```
+
+### 构造前验证
+
+```php
+$errors = UserDomain::validateArray($_POST);
+
+if ($errors === []) {
+    $user = UserDomain::fromArray($_POST);
+}
+```
+
+### 错误格式
+
+错误使用结构化代码而非硬编码消息，i18n 就绪：
+
+```php
+['字段名' => ['rule' => 'minLength', 'params' => ['min' => 3]]]
+```
+
+配合 `migears/i18n` 翻译：
+
+```php
+$message = $translator->get(
+    "validation.{$error['rule']}",
+    ['field' => $fieldLabel, ...$error['params']]
+);
+```
 
 ## 为什么用 Trait 而不是基类？
 

@@ -1,10 +1,19 @@
 {
     "name": "migears/domain",
-    "description": "Minimalist Domain base \u2014 pure data containers with zero mapping",
+    "description": "Minimalist Domain \u2014 data containers with array access and self-validation",
     "type": "library",
     "license": "MIT",
+    "version": "2.0.0",
+    "keywords": [
+        "domain",
+        "dto",
+        "data",
+        "validation",
+        "migears"
+    ],
     "require": {
-        "php": "^8.1"
+        "php": "^8.1",
+        "migears/validator": "^2.0@dev"
     },
     "require-dev": {
         "phpunit/phpunit": "^10"
@@ -19,5 +28,10 @@
             "MiGears\\Domain\\Tests\\": "tests/"
         }
     },
-    "version": "2.0.0"
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../migears-validator"
+        }
+    ]
 }
