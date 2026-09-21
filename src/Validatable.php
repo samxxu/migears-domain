@@ -42,7 +42,16 @@ use MiGears\Validator\Validator;
  */
 trait Validatable
 {
-    private static ?Validator $validatorInstance = null;
+    /**
+     * Validator instances keyed by class name.
+     *
+     * Trait static properties are copied only to the class that uses the trait
+     * and are shared by its subclasses. Keeping a per-class map (instead of a
+     * single cached instance) guarantees each concrete class gets its own
+     * Validator seeded with its own customValidators(), even when the parent
+     * initialises first.
+     */
+    private static array $validatorInstances = [];
 
     /**
      * Define validation rules for this domain class.
@@ -52,6 +61,22 @@ trait Validatable
      * @return array<string, array<string, mixed>>
      */
     abstract protected static function validationRules(): array;
+
+    /**
+     * Optional custom validators to pre-register on this domain class's
+     * shared Validator instance.
+     *
+     * Each entry is a validator class-string (e.g.
+     * `StrongPasswordValidator::class`); the rule alias is derived from the
+     * class name. Override in the domain class to add rules beyond the built-in
+     * set. Defaults to none.
+     *
+     * @return list<class-string<\MiGears\Validator\ValidatorInterface>>
+     */
+    protected static function customValidators(): array
+    {
+        return [];
+    }
 
     /**
      * Validate the current object state against the defined rules.
@@ -103,14 +128,19 @@ trait Validatable
     }
 
     /**
-     * Get the shared Validator instance.
+     * Get the Validator instance for the calling class.
+     *
+     * Keyed by static::class so subclasses do not share a parent's seeded
+     * instance within an inheritance chain.
      */
     private static function getValidator(): Validator
     {
-        if (self::$validatorInstance === null) {
-            self::$validatorInstance = new Validator();
+        $class = static::class;
+
+        if (!isset(self::$validatorInstances[$class])) {
+            self::$validatorInstances[$class] = new Validator(static::customValidators());
         }
 
-        return self::$validatorInstance;
+        return self::$validatorInstances[$class];
     }
 }

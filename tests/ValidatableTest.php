@@ -182,6 +182,39 @@ final class ValidatableTest extends TestCase
         self::assertFalse(ValidatableUser::isValidArray($data));
     }
 
+    // --- customValidators hook ---
+
+    public function testCustomValidatorFromHookIsUsed(): void
+    {
+        self::assertSame([], EvenUser::validateArray(['value' => 4]));
+
+        $errors = EvenUser::validateArray(['value' => 3]);
+        self::assertSame('evenNumber', $errors['value']['rule']);
+    }
+
+    public function testCustomValidatorsDoNotLeakToUndeclaredClass(): void
+    {
+        // UnknownRuleUser references the evenNumber rule but does not declare
+        // the custom validator, so its own Validator instance must not know it.
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unknown validator: evenNumber');
+        UnknownRuleUser::validateArray(['value' => 4]);
+    }
+
+    // --- Parent/child inheritance ---
+
+    public function testChildCustomValidatorHonouredEvenWhenParentInitialisedFirst(): void
+    {
+        // The parent initialises the shared Validator first (no custom rules).
+        // The child extends the parent and adds evenNumber via customValidators().
+        ParentValidatableUser::validateArray(['value' => 4]);
+
+        self::assertSame([], ChildValidatableUser::validateArray(['value' => 4]));
+
+        $errors = ChildValidatableUser::validateArray(['value' => 3]);
+        self::assertSame('evenNumber', $errors['value']['rule']);
+    }
+
     // --- Integration with DataAccess ---
 
     public function testFromArrayAndValidate(): void

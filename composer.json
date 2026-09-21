@@ -1,6 +1,6 @@
 {
     "name": "migears/domain",
-    "description": "Minimalist Domain \u2014 data containers with array access and self-validation",
+    "description": "Minimalist Domain — data containers with array access and self-validation",
     "type": "library",
     "license": "MIT",
     "version": "2.0.0",
@@ -33,5 +33,8 @@
             "type": "path",
             "url": "../migears-validator"
         }
-    ]
+    ],
+    "scripts": {
+        "test": "phpunit"
+    }
 }

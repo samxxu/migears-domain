@@ -70,6 +70,23 @@ $back = $domain->toArray();
 // $back === $row  ✅
 ```
 
+## Type Contract
+
+`fromArray()` binds values via PHP 8.x **strict typed named arguments**, so no type coercion happens here. Every value must already be of the type declared by the constructor parameter:
+
+- an `int $id` parameter requires a genuine PHP `int`, not the string `'1'`
+- a missing key, an extra key, or a type mismatch throws a native `\Error` / `\TypeError`
+
+The responsibility for native typing sits with the **data source layer** (DAO / SQL), not the Domain:
+
+```
+SQL / DAO guarantees → native PHP types (int, string, bool, float, nullable)
+                   ↓
+  Domain::fromArray() only binds them positionally (no hydration, no casting)
+```
+
+This is why the Domain layer stays free of hydrators and scalar-conversion logic.
+
 ## Naming Convention
 
 | Layer | Convention | Example |
@@ -154,6 +171,37 @@ if ($errors === []) {
     $user = UserDomain::fromArray($_POST);
 }
 ```
+
+### Custom validation rules
+
+Rules that are not part of the built-in set can be added by overriding `customValidators()`. Each entry is a validator class-string (the rule alias is derived from the class name); the domain class's shared validator is pre-registered with these on first use, scoped to that class only.
+
+```php
+use MiGears\Validator\ValidatorInterface;
+
+final class StrongPasswordValidator implements ValidatorInterface
+{
+    public function validate(mixed $value): bool { /* ... */ }
+    public function getErrorCode(): string { return 'strongPassword'; }
+    public function getErrorParams(): array { return []; }
+}
+
+class UserDomain
+{
+    use DataAccess;
+    use Validatable;
+
+    // ...constructor & validationRules()...
+
+    protected static function customValidators(): array
+    {
+        return [StrongPasswordValidator::class];
+        // `strongPassword` is now available in validationRules()
+    }
+}
+```
+
+Custom rules registered for one domain class never leak into others.
 
 ### Error format
 
@@ -256,6 +304,23 @@ $back = $domain->toArray();
 // $back === $row  ✅
 ```
 
+## 类型契约
+
+`fromArray()` 通过 PHP 8.x **强类型命名参数**绑定值，因此这里**不做任何类型转换**。每个值必须已经是构造参数所声明的类型：
+
+- `int $id` 参数需要真正的 PHP `int`，而不是字符串 `'1'`
+- 缺少键、多出键或类型不匹配都会抛出原生 `\Error` / `\TypeError`
+
+原生类型保证的责任在**数据源层**（DAO / SQL），而非 Domain 层：
+
+```
+SQL / DAO 保证 → 原生 PHP 类型（int、string、bool、float、nullable）
+             ↓
+  Domain::fromArray() 仅按位绑定（不 hydration、不强制转换）
+```
+
+这正是为什么 Domain 层不需要 hydrator 和标量转换逻辑。
+
 ## 命名规范
 
 | 层级 | 规范 | 示例 |
@@ -340,6 +405,37 @@ if ($errors === []) {
     $user = UserDomain::fromArray($_POST);
 }
 ```
+
+### 自定义验证规则
+
+不在内置集合里的规则，可通过覆盖 `customValidators()` 添加。每个条目是一个验证器类名（规则别名由类名推导）；domain 类在首次使用时把自定义规则预注册到共享的验证器实例上，且仅作用于本类。
+
+```php
+use MiGears\Validator\ValidatorInterface;
+
+final class StrongPasswordValidator implements ValidatorInterface
+{
+    public function validate(mixed $value): bool { /* ... */ }
+    public function getErrorCode(): string { return 'strongPassword'; }
+    public function getErrorParams(): array { return []; }
+}
+
+class UserDomain
+{
+    use DataAccess;
+    use Validatable;
+
+    // ...构造器与 validationRules()...
+
+    protected static function customValidators(): array
+    {
+        return [StrongPasswordValidator::class];
+        // `strongPassword` 现在可以在 validationRules() 中使用
+    }
+}
+```
+
+为一个 domain 类注册的自定义规则不会泄漏到其它类。
 
 ### 错误格式
 

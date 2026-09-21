@@ -32,6 +32,12 @@ trait DataAccess
      * Uses PHP 8.x named arguments via array spreading, so column names
      * must match constructor parameter names exactly.
      *
+     * No type coercion is performed: each value must already match the type
+     * declared by the corresponding constructor parameter. Supplying native
+     * types is the responsibility of the data source layer (DAO/SQL), not the
+     * Domain. A missing key, extra key, or type mismatch throws a native \Error
+     * or \TypeError.
+     *
      * @param array<string, mixed> $row
      */
     public static function fromArray(array $row): static
