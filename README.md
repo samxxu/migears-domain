@@ -4,6 +4,10 @@
 
 Minimalist Domain layer — pure data containers with zero mapping.
 
+> **Background**: miGears is the open-source successor of **TinyGears**, a
+> self-developed PHP framework. It was renamed and open-sourced recently because
+> the name *TinyGears* is already taken in the open-source community.
+
 ## Philosophy
 
 - **No Getter/Setter** — properties are `public readonly`
