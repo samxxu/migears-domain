@@ -16,7 +16,8 @@
         "migears/validator": "^2.0@dev"
     },
     "require-dev": {
-        "phpunit/phpunit": "^10"
+        "phpunit/phpunit": "^10",
+        "phpstan/phpstan": "^2.2"
     },
     "autoload": {
         "psr-4": {
@@ -35,6 +36,7 @@
         }
     ],
     "scripts": {
-        "test": "phpunit"
+        "test": "phpunit",
+        "analyse": "phpstan analyse"
     }
 }
