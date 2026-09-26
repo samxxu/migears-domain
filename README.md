@@ -119,6 +119,108 @@ PDO / MySQL
 - DAO uses `fromArray()` to convert SQL results into Domain objects
 - DAO uses `toArray()` to convert Domain objects back to arrays for SQL
 
+## Related Data (Lazy Loading)
+
+Domain objects stay pure: they never hold a DAO, a Manager, or any other module
+reference. When business code still wants `$order->items()`, the recommended
+practice is a **static loader injected before construction** — the Domain declares
+the accessor, the Manager supplies the implementation. All dependency knowledge
+therefore stays in the Manager, and the Domain remains independently testable.
+
+### Manager side
+
+```php
+final class OrderManager
+{
+    public function __construct(private OrderItemDao $itemDao) {}
+
+    public function boot(): void
+    {
+        OrderDomain::setItemLoader(
+            fn(OrderDomain $order) => $this->itemDao->getByOrderId($order->id)
+        );
+    }
+}
+```
+
+### Domain side
+
+```php
+use Closure;
+use MiGears\Domain\DataAccess;
+use RuntimeException;
+
+class OrderDomain
+{
+    use DataAccess;
+
+    /** @var null|Closure(self): list<OrderItemDomain> */
+    private static ?Closure $itemLoader = null;
+
+    public function __construct(
+        public readonly int $id,
+        public readonly string $title,
+    ) {}
+
+    public static function setItemLoader(?callable $loader): void
+    {
+        static::$itemLoader = $loader === null ? null : Closure::fromCallable($loader);
+    }
+
+    /** @return list<OrderItemDomain> */
+    public function items(): array
+    {
+        if (static::$itemLoader === null) {
+            throw new RuntimeException('OrderDomain::setItemLoader() was not called');
+        }
+
+        return (static::$itemLoader)($this);
+    }
+}
+```
+
+```php
+$order = OrderDomain::fromArray($row);
+$order->items();     // loaded through the Manager's callable
+$order->toArray();   // ['id' => ..., 'title' => ...] — loader not included
+```
+
+### Why not store the loader on the instance?
+
+Because any instance property leaks into persistence. `toArray()` is
+`get_object_vars($this)`, so a stored callable — **even a `private` one** — ends up
+in the array the DAO hands to SQL:
+
+```
+toArray() → ['id' => 7, 'title' => 'Order A', 'itemsLoader' => Closure]
+SQL       → ERROR: table orders has no column named itemsLoader
+```
+
+Static storage keeps `fromArray()` and `toArray()` untouched.
+
+### Rules
+
+- Declare the slot as `?Closure`. A property typed `callable` is a **fatal error**
+  (`Property ... cannot have type callable`); accept `callable` in the setter and
+  normalise with `Closure::fromCallable()`.
+- Accept `?callable` and treat `null` as reset. Static state outlives a single
+  test, so `tearDown()` should call `setItemLoader(null)`.
+- Throw when the loader was never injected. Returning `[]` silently would make
+  "no related records" and "not configured" indistinguishable.
+- Use `static::` rather than `self::` so the accessor stays overridable.
+- A subclass that declares no slot of its own inherits its parent's loader; to get
+  an independent one it must declare its own slot and setter.
+- This is deliberate global state — the only place this package recommends it.
+  Inject once, from a single bootstrap or Manager location.
+
+### When to use it
+
+Use it for related records and child collections that you do not want to load
+eagerly and do not want the Domain to know how to fetch. Do not use it for plain
+column reads — those already live on the object — and do not use it when callers
+need different loaders for the same class; that is a sign the caller should ask
+the Manager instead.
+
 ## Self-Validation with Validatable
 
 Domain objects can validate their own data using the `Validatable` trait. Validation rules are defined in the domain class itself, and errors are returned as structured error codes + params (i18n-ready).
@@ -352,6 +454,98 @@ PDO / MySQL
 - Domain 不知道 SQL 和 DAO 的存在
 - DAO 用 `fromArray()` 把 SQL 结果转为 Domain 对象
 - DAO 用 `toArray()` 把 Domain 对象转回数组供 SQL 使用
+
+## 关联数据（懒加载）
+
+Domain 对象保持纯净：不持有 DAO、Manager 或任何其他模块引用。当业务代码仍希望写成
+`$order->items()` 时，推荐的做法是**在构造之前注入静态 loader**——Domain 只声明访问器，
+实现由 Manager 提供。依赖知识因此全部留在 Manager 中，Domain 依旧可独立测试。
+
+### Manager 侧
+
+```php
+final class OrderManager
+{
+    public function __construct(private OrderItemDao $itemDao) {}
+
+    public function boot(): void
+    {
+        OrderDomain::setItemLoader(
+            fn(OrderDomain $order) => $this->itemDao->getByOrderId($order->id)
+        );
+    }
+}
+```
+
+### Domain 侧
+
+```php
+use Closure;
+use MiGears\Domain\DataAccess;
+use RuntimeException;
+
+class OrderDomain
+{
+    use DataAccess;
+
+    /** @var null|Closure(self): list<OrderItemDomain> */
+    private static ?Closure $itemLoader = null;
+
+    public function __construct(
+        public readonly int $id,
+        public readonly string $title,
+    ) {}
+
+    public static function setItemLoader(?callable $loader): void
+    {
+        static::$itemLoader = $loader === null ? null : Closure::fromCallable($loader);
+    }
+
+    /** @return list<OrderItemDomain> */
+    public function items(): array
+    {
+        if (static::$itemLoader === null) {
+            throw new RuntimeException('OrderDomain::setItemLoader() was not called');
+        }
+
+        return (static::$itemLoader)($this);
+    }
+}
+```
+
+```php
+$order = OrderDomain::fromArray($row);
+$order->items();     // 经 Manager 注入的 callable 加载
+$order->toArray();   // ['id' => ..., 'title' => ...] —— 不含 loader
+```
+
+### 为什么不把 loader 存在实例上
+
+因为任何实例属性都会污染持久化。`toArray()` 的实现是 `get_object_vars($this)`，
+所以存下来的 callable——**即便是 `private` 的**——会进入 DAO 交给 SQL 的数组：
+
+```
+toArray() → ['id' => 7, 'title' => 'Order A', 'itemsLoader' => Closure]
+SQL       → ERROR: table orders has no column named itemsLoader
+```
+
+静态存储则让 `fromArray()` 和 `toArray()` 完全不受影响。
+
+### 约定
+
+- 成员声明为 `?Closure`。属性类型写 `callable` 会**致命错误**（`Property ... cannot have
+  type callable`）；setter 收 `callable`，用 `Closure::fromCallable()` 归一化。
+- setter 收 `?callable`，把 `null` 视为复位。静态状态会跨测试存活，因此 `tearDown()`
+  应调用 `setItemLoader(null)`。
+- loader 从未注入时应当抛异常。静默返回 `[]` 会让「没有关联数据」与「忘了配置」无法区分。
+- 用 `static::` 而非 `self::`，让访问器保持可覆盖。
+- 未自行声明槽位的子类会继承父类的 loader；若需独立的 loader，子类必须自己声明槽位与 setter。
+- 这是刻意的全局状态，也是本包唯一推荐使用它的地方。请只在一处 bootstrap 或 Manager 中注入。
+
+### 适用场景
+
+适用于不想预加载、也不想让 Domain 知道如何取数的关联记录与子集合。纯字段读取不必使用——
+它们本就在对象上；而如果不同调用方需要同一类的不同 loader，则说明应由调用方去问 Manager。
 
 ## Validatable 自验证
 
