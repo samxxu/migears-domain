@@ -10,6 +10,8 @@ namespace MiGears\Domain;
  * Domain classes use this trait to gain fromArray() and toArray()
  * without any base class inheritance or external hydrator.
  *
+ *   use MiGears\Domain\DataAccess;
+ *
  *   class UserDomain
  *   {
  *       use DataAccess;

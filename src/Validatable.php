@@ -17,8 +17,12 @@ use MiGears\Validator\Validator;
  * ready for i18n translation.
  *
  * Usage:
+ *   use MiGears\Domain\DataAccess;
+ *   use MiGears\Domain\Validatable;
+ *
  *   class UserDomain
  *   {
+ *       use DataAccess;
  *       use Validatable;
  *
  *       public function __construct(
