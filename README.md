@@ -81,15 +81,30 @@ $back = $domain->toArray();
 - an `int $id` parameter requires a genuine PHP `int`, not the string `'1'`
 - a missing key, an extra key, or a type mismatch throws a native `\Error` / `\TypeError`
 
-The responsibility for native typing sits with the **data source layer** (DAO / SQL), not the Domain:
+Native typing is **not** something the Domain — or the DAO — has to produce; PDO
+already does it. Since PHP 8.1 a result set carries real PHP `int` / `float` for
+numeric columns, under both emulated and native prepares and on every bundled
+driver. The value chain is therefore:
 
 ```
-SQL / DAO guarantees → native PHP types (int, string, bool, float, nullable)
+PDO (PHP 8.1+) → native PHP types (int, float, string, null)
                    ↓
   Domain::fromArray() only binds them positionally (no hydration, no casting)
 ```
 
-This is why the Domain layer stays free of hydrators and scalar-conversion logic.
+This is why neither the Domain nor the DAO needs a hydrator or scalar-conversion
+logic.
+
+Three things to watch for:
+
+- `DECIMAL` columns stay `string` (precision-preserving) — declare them `string`
+- `TINYINT(1)` columns are `int` — declare them `int`, not `bool`
+- never enable `PDO::ATTR_STRINGIFY_FETCHES`: it restores the old
+  string-everything behaviour and breaks every `int` property
+
+A mismatch between a constructor type and its column fails **loudly** with a
+native `\TypeError` rather than converting silently — that is intentional: it
+surfaces schema drift on the spot instead of coercing `'2024-01-01'` into `2024`.
 
 ## Naming Convention
 
@@ -417,15 +432,27 @@ $back = $domain->toArray();
 - `int $id` 参数需要真正的 PHP `int`，而不是字符串 `'1'`
 - 缺少键、多出键或类型不匹配都会抛出原生 `\Error` / `\TypeError`
 
-原生类型保证的责任在**数据源层**（DAO / SQL），而非 Domain 层：
+原生类型**并不是** Domain（或 DAO）需要产出的东西 — PDO 已经给出了。PHP 8.1
+起，结果集对数字列即返回真正的 PHP `int` / `float`，模拟预处理与原生预处理
+皆然，各内置驱动一致。因此取值链路是：
 
 ```
-SQL / DAO 保证 → 原生 PHP 类型（int、string、bool、float、nullable）
+PDO（PHP 8.1+）→ 原生 PHP 类型（int、float、string、null）
              ↓
   Domain::fromArray() 仅按位绑定（不 hydration、不强制转换）
 ```
 
-这正是为什么 Domain 层不需要 hydrator 和标量转换逻辑。
+这正是为什么 Domain 与 DAO 都不需要 hydrator 和标量转换逻辑。
+
+有三点需要注意：
+
+- `DECIMAL` 列保持 `string`（为保留精度）— 请声明为 `string`
+- `TINYINT(1)` 列是 `int` — 请声明为 `int`，而非 `bool`
+- 切勿开启 `PDO::ATTR_STRINGIFY_FETCHES`：它会恢复「一切皆字符串」的旧行为，
+  使每个 `int` 属性都报错
+
+构造参数类型与列类型不一致时会**大声失败**（原生 `\TypeError`），而不是静默
+转换 — 这是刻意设计：当场暴露 schema 漂移，而非把 `'2024-01-01'` 强转成 `2024`。
 
 ## 命名规范
 

@@ -35,10 +35,11 @@ trait DataAccess
      * must match constructor parameter names exactly.
      *
      * No type coercion is performed: each value must already match the type
-     * declared by the corresponding constructor parameter. Supplying native
-     * types is the responsibility of the data source layer (DAO/SQL), not the
-     * Domain. A missing key, extra key, or type mismatch throws a native \Error
-     * or \TypeError.
+     * declared by the corresponding constructor parameter. PDO supplies those
+     * native types itself (since PHP 8.1), so neither the Domain nor the DAO
+     * needs a casting layer. A missing key, extra key, or type mismatch throws
+     * a native \Error or \TypeError — loud on purpose, so schema drift surfaces
+     * instead of being silently coerced.
      *
      * @param array<string, mixed> $row
      */
