@@ -22,7 +22,7 @@ Minimalist Domain layer — pure data containers with zero mapping.
 composer require migears/domain
 ```
 
-Requires: PHP 8.1+.
+Requires: PHP 8.1+, `migears/validator`.
 
 ## Quick Start
 
@@ -383,7 +383,7 @@ MIT
 composer require migears/domain
 ```
 
-要求：PHP 8.1+。
+要求：PHP 8.1+、`migears/validator`。
 
 ## 快速开始
 
