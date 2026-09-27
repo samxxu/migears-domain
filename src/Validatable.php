@@ -16,6 +16,10 @@ use MiGears\Validator\Validator;
  * Errors are returned as structured error codes + params,
  * ready for i18n translation.
  *
+ * Instance-level validation reads the object through `toArray()`, so a class
+ * that calls `validate()` or `isValid()` must also use the `DataAccess` trait.
+ * The static `validateArray()` / `isValidArray()` methods work without it.
+ *
  * Usage:
  *   use MiGears\Domain\DataAccess;
  *   use MiGears\Domain\Validatable;

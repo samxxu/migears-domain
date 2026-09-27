@@ -71,8 +71,13 @@ $row = $user->toArray();
 ```php
 $domain = UserDomain::fromArray($row);
 $back = $domain->toArray();
-// $back === $row  ✅
+// $back === $row  ✅  (same key order)
 ```
+
+`===` also requires an identical key order: `get_object_vars()` returns properties in
+declaration order, so a `SELECT *` whose column order differs from the constructor's
+parameter order makes `===` false while `==` stays true. Either list the columns
+explicitly in the query, or compare with `==`.
 
 ## Type Contract
 
@@ -147,9 +152,7 @@ therefore stays in the Manager, and the Domain remains independently testable.
 ```php
 final class OrderManager
 {
-    public function __construct(private OrderItemDao $itemDao) {}
-
-    public function boot(): void
+    public function __construct(private OrderItemDao $itemDao)
     {
         OrderDomain::setItemLoader(
             fn(OrderDomain $order) => $this->itemDao->getByOrderId($order->id)
@@ -157,6 +160,10 @@ final class OrderManager
     }
 }
 ```
+
+There is no lifecycle hook here and nothing calls a `boot()` for you: the wiring builds
+each Manager once, before anything is served, so the constructor is the place
+(see `migears/manager`).
 
 ### Domain side
 
@@ -226,7 +233,7 @@ Static storage keeps `fromArray()` and `toArray()` untouched.
 - A subclass that declares no slot of its own inherits its parent's loader; to get
   an independent one it must declare its own slot and setter.
 - This is deliberate global state — the only place this package recommends it.
-  Inject once, from a single bootstrap or Manager location.
+  Inject once, from a single place: the Manager's constructor.
 
 ### When to use it
 
@@ -335,17 +342,20 @@ Errors use structured codes instead of hardcoded messages, ready for i18n:
 Pair with `migears/i18n` to translate:
 
 ```php
-$message = $translator->get(
+$message = $translator->translate(
     "validation.{$error['rule']}",
     ['field' => $fieldLabel, ...$error['params']]
 );
 ```
 
+Placeholders follow the `%name%` convention, so the template behind the example
+above would read `Too short, at least %min%.`
+
 ## Why a Trait Instead of a Base Class?
 
 1. **No inheritance constraint** — Domain classes can extend whatever they need
 2. **Zero overhead** — trait methods are inlined into the class
-3. **Maximum readability** — two methods, total ~15 lines of code
+3. **Maximum readability** — `DataAccess` is two methods, about 15 lines of code
 
 ## License
 
@@ -422,8 +432,12 @@ $row = $user->toArray();
 ```php
 $domain = UserDomain::fromArray($row);
 $back = $domain->toArray();
-// $back === $row  ✅
+// $back === $row  ✅  （键序一致时）
 ```
+
+`===` 还要求键序完全一致：`get_object_vars()` 按属性声明序返回，因此当 `SELECT *` 的
+列序与构造参数序不同时，`===` 为 false 而 `==` 仍为 true。可在查询中显式列出列序，
+或改用 `==` 比较。
 
 ## 类型契约
 
@@ -493,9 +507,7 @@ Domain 对象保持纯净：不持有 DAO、Manager 或任何其他模块引用�
 ```php
 final class OrderManager
 {
-    public function __construct(private OrderItemDao $itemDao) {}
-
-    public function boot(): void
+    public function __construct(private OrderItemDao $itemDao)
     {
         OrderDomain::setItemLoader(
             fn(OrderDomain $order) => $this->itemDao->getByOrderId($order->id)
@@ -503,6 +515,9 @@ final class OrderManager
     }
 }
 ```
+
+这里没有生命周期钩子，也没有任何东西会替你调用 `boot()`：wiring 在对外提供服务之前
+把每个 Manager 建一次，所以构造函数就是它该在的地方（见 `migears/manager`）。
 
 ### Domain 侧
 
@@ -567,7 +582,7 @@ SQL       → ERROR: table orders has no column named itemsLoader
 - loader 从未注入时应当抛异常。静默返回 `[]` 会让「没有关联数据」与「忘了配置」无法区分。
 - 用 `static::` 而非 `self::`，让访问器保持可覆盖。
 - 未自行声明槽位的子类会继承父类的 loader；若需独立的 loader，子类必须自己声明槽位与 setter。
-- 这是刻意的全局状态，也是本包唯一推荐使用它的地方。请只在一处 bootstrap 或 Manager 中注入。
+- 这是刻意的全局状态，也是本包唯一推荐使用它的地方。请只在一处注入：Manager 的构造函数。
 
 ### 适用场景
 
@@ -673,17 +688,20 @@ class UserDomain
 配合 `migears/i18n` 翻译：
 
 ```php
-$message = $translator->get(
+$message = $translator->translate(
     "validation.{$error['rule']}",
     ['field' => $fieldLabel, ...$error['params']]
 );
 ```
 
+占位符遵循 `migears/i18n` 的 `%name%` 约定，例如上面示例对应的消息模板可写作
+`太短了，至少 %min% 个字符`。
+
 ## 为什么用 Trait 而不是基类？
 
 1. **不受继承约束** — Domain 类可以继承任何需要的父类
 2. **零开销** — trait 方法会被内联到类中
-3. **最大可读性** — 两个方法，总共约 15 行代码
+3. **最大可读性** — `DataAccess` 只有两个方法，约 15 行代码
 
 ## 许可证
 
