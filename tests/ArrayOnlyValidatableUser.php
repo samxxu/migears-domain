@@ -7,12 +7,12 @@ namespace MiGears\Domain\Tests;
 use MiGears\Domain\Validatable;
 
 /**
- * Fixture that deliberately uses Validatable WITHOUT DataAccess.
+ * Fixture that uses Validatable WITHOUT DataAccess.
  *
- * Only the static entry points (validateArray / isValidArray) are usable here:
- * the instance ones (validate / isValid) read the object through toArray(),
- * which DataAccess provides. ValidatableTest pins that boundary so it stays
- * visible rather than surfacing as a surprise at call time.
+ * Validatable declares toArray() abstract, so a class using it either pulls it
+ * in with DataAccess or implements it itself — as this one does. Both the static
+ * entry points (validateArray / isValidArray) and the instance ones (validate /
+ * isValid) therefore work, with no dependency on DataAccess.
  */
 final class ArrayOnlyValidatableUser
 {
@@ -23,5 +23,13 @@ final class ArrayOnlyValidatableUser
     protected static function validationRules(): array
     {
         return ['value' => ['integer' => true]];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        return get_object_vars($this);
     }
 }

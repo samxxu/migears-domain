@@ -243,36 +243,29 @@ final class ValidatableTest extends TestCase
         self::assertSame('max', $errors['age']['rule']);
     }
 
-    // --- DataAccess dependency (characterisation) ---
+    // --- toArray() contract ---
 
-    public function testStaticValidationWorksWithoutDataAccess(): void
+    public function testToArrayIsDeclaredOnTheTraitSoTheDependencyIsEnforced(): void
     {
-        // ArrayOnlyValidatableUser uses Validatable alone: the static entry
-        // points never read the instance, so they work as they are.
+        // validate() reads the instance through toArray(); declaring it abstract
+        // makes a class that lacks it fail at declaration rather than at call time.
+        $method = (new \ReflectionClass(Validatable::class))->getMethod('toArray');
+
+        self::assertTrue($method->isAbstract());
+        self::assertSame(0, $method->getNumberOfParameters());
+        self::assertNotNull($method->getReturnType());
+        self::assertSame('array', (string) $method->getReturnType());
+    }
+
+    public function testClassSupplyingItsOwnToArrayValidatesWithoutDataAccess(): void
+    {
+        // ArrayOnlyValidatableUser uses Validatable alone and implements toArray()
+        // itself; both entry points work with no DataAccess involved.
         self::assertSame([], ArrayOnlyValidatableUser::validateArray(['value' => 4]));
         self::assertTrue(ArrayOnlyValidatableUser::isValidArray(['value' => 4]));
-    }
 
-    public function testInstanceValidationNeedsToArrayFromDataAccess(): void
-    {
-        // Without DataAccess there is no toArray(), so validate() fails at call
-        // time — the trait declares no contract for it. Pinned here so the
-        // boundary is documented instead of discovered at runtime.
-        $user = new ArrayOnlyValidatableUser(4);
-
-        $this->expectException(\Error::class);
-        $this->expectExceptionMessage('Call to undefined method');
-
-        $user->validate();
-    }
-
-    public function testIsValidNeedsToArrayAsWell(): void
-    {
-        $user = new ArrayOnlyValidatableUser(4);
-
-        $this->expectException(\Error::class);
-        $this->expectExceptionMessage('Call to undefined method');
-
-        $user->isValid();
+        $valid = new ArrayOnlyValidatableUser(4);
+        self::assertSame([], $valid->validate());
+        self::assertTrue($valid->isValid());
     }
 }

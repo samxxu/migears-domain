@@ -22,4 +22,15 @@ class ParentValidatableUser
     {
         return ['value' => ['integer' => true]];
     }
+
+    /**
+     * Validatable declares toArray() abstract; the parent supplies it, and the
+     * child inherits it.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        return get_object_vars($this);
+    }
 }

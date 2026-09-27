@@ -20,4 +20,15 @@ final class UnknownRuleUser
     {
         return ['value' => ['evenNumber' => true]];
     }
+
+    /**
+     * Validatable declares toArray() abstract; this fixture supplies it itself
+     * rather than through DataAccess.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        return get_object_vars($this);
+    }
 }

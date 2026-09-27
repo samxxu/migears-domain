@@ -16,9 +16,11 @@ use MiGears\Validator\Validator;
  * Errors are returned as structured error codes + params,
  * ready for i18n translation.
  *
- * Instance-level validation reads the object through `toArray()`, so a class
- * that calls `validate()` or `isValid()` must also use the `DataAccess` trait.
- * The static `validateArray()` / `isValidArray()` methods work without it.
+ * Instance-level validation reads the object through `toArray()`, so this trait
+ * declares it abstract: a class that uses `Validatable` must supply `toArray()`,
+ * either by using the `DataAccess` trait or by implementing it itself. The
+ * static `validateArray()` / `isValidArray()` methods still read an array
+ * directly, but the class they belong to has to satisfy the same contract.
  *
  * Usage:
  *   use MiGears\Domain\DataAccess;
@@ -69,6 +71,19 @@ trait Validatable
      * @return array<string, array<string, mixed>>
      */
     abstract protected static function validationRules(): array;
+
+    /**
+     * The object state to validate, as a field-name keyed array.
+     *
+     * Declared abstract because validate() and isValid() read the instance
+     * through it: a class using this trait must provide it, so the dependency is
+     * a compile-time contract instead of an undefined-method error at call time.
+     * DataAccess supplies a get_object_vars()-based implementation; a class that
+     * does not use it may implement its own.
+     *
+     * @return array<string, mixed>
+     */
+    abstract public function toArray(): array;
 
     /**
      * Optional custom validators to pre-register on this domain class's
