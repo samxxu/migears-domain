@@ -355,7 +355,7 @@ above would read `Too short, at least %min%.`
 
 1. **No inheritance constraint** — Domain classes can extend whatever they need
 2. **Zero overhead** — trait methods are inlined into the class
-3. **Maximum readability** — `DataAccess` is two methods, about 15 lines of code
+3. **Maximum readability** — `DataAccess` is two methods, each a single line of logic
 
 ## License
 
@@ -701,7 +701,7 @@ $message = $translator->translate(
 
 1. **不受继承约束** — Domain 类可以继承任何需要的父类
 2. **零开销** — trait 方法会被内联到类中
-3. **最大可读性** — `DataAccess` 只有两个方法，约 15 行代码
+3. **最大可读性** — `DataAccess` 只有两个方法，各一行逻辑
 
 ## 许可证
 

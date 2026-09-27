@@ -205,7 +205,7 @@ final class ValidatableTest extends TestCase
 
     public function testChildCustomValidatorHonouredEvenWhenParentInitialisedFirst(): void
     {
-        // The parent initialises the shared Validator first (no custom rules).
+        // The parent initialises its own Validator first (no custom rules).
         // The child extends the parent and adds evenNumber via customValidators().
         ParentValidatableUser::validateArray(['value' => 4]);
 
@@ -241,5 +241,38 @@ final class ValidatableTest extends TestCase
         self::assertSame('minLength', $errors['username']['rule']);
         self::assertSame('email', $errors['email']['rule']);
         self::assertSame('max', $errors['age']['rule']);
+    }
+
+    // --- DataAccess dependency (characterisation) ---
+
+    public function testStaticValidationWorksWithoutDataAccess(): void
+    {
+        // ArrayOnlyValidatableUser uses Validatable alone: the static entry
+        // points never read the instance, so they work as they are.
+        self::assertSame([], ArrayOnlyValidatableUser::validateArray(['value' => 4]));
+        self::assertTrue(ArrayOnlyValidatableUser::isValidArray(['value' => 4]));
+    }
+
+    public function testInstanceValidationNeedsToArrayFromDataAccess(): void
+    {
+        // Without DataAccess there is no toArray(), so validate() fails at call
+        // time — the trait declares no contract for it. Pinned here so the
+        // boundary is documented instead of discovered at runtime.
+        $user = new ArrayOnlyValidatableUser(4);
+
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Call to undefined method');
+
+        $user->validate();
+    }
+
+    public function testIsValidNeedsToArrayAsWell(): void
+    {
+        $user = new ArrayOnlyValidatableUser(4);
+
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Call to undefined method');
+
+        $user->isValid();
     }
 }

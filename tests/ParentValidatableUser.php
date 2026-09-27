@@ -7,9 +7,10 @@ namespace MiGears\Domain\Tests;
 use MiGears\Domain\Validatable;
 
 /**
- * Inheritable fixture with a built-in rule only. Used to prove whether a child
- * class's customValidators() is honoured when the parent initialises the
- * shared Validator first.
+ * Inheritable fixture with a built-in rule only. Used to prove that a child
+ * class's customValidators() is honoured even when the parent has already
+ * initialised its own Validator: instances are cached per static::class, so the
+ * child gets its own rather than sharing the parent's.
  */
 class ParentValidatableUser
 {
