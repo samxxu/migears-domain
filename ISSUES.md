@@ -4,7 +4,7 @@
 > per item: a front-matter header and a thread. This file is generated from them and can be rewritten at
 > any time; edit an item, never this file.
 >
-> From the miGears Full-Module Code Review Report (5th round, 2026-09-28).
+> From the miGears Full-Module Code Review Report (6th round, 2026-10-01).
 
 | | |
 |---|---|
@@ -17,18 +17,19 @@ Legend — **P0** functional or security · **P1** documentation that fails when
 
 | | |
 |---|---|
-| Unsettled | P0 0 · P1 0 · P2 1 · P3 0 · other 0 |
-| Settled | 2 of 3 |
-| Waiting on the owner | `P2-1` |
+| Unsettled | P0 0 · P1 0 · P2 0 · P3 1 · other 0 |
+| Settled | 3 of 4 |
+| Waiting on the owner | _nothing_ |
 | Waiting on the coordinator | _nothing_ |
-| Waiting on the reviewer | _nothing_ |
+| Waiting on the reviewer | `P3-3` |
 | Deferred, owing nobody | _nothing_ |
 
 | id | level | status | title |
 |---|---|---|---|
-| [`P2-1`](issues/P2-1.md) | P2 | **accepted** | `Validatable::validate()` calls `$this->toArray()`, which comes from … |
+| [`P2-1`](issues/P2-1.md) | P2 | **verified** | `Validatable::validate()` calls `$this->toArray()`, which comes from … |
 | [`P3-1`](issues/P3-1.md) | P3 | **verified** | The README describes `DataAccess` as 'about 15 lines' while the file is … |
 | [`P3-2`](issues/P3-2.md) | P3 | **verified** | Two comments still describe the opposite behaviour: … |
+| [`P3-3`](issues/P3-3.md) | P3 | **fixed** | The README says twice that fromArray() 'binds positionally', while … |
 
 ## Unclosed
 
@@ -37,25 +38,25 @@ highest severity first. `waiting on` is the party who acts next, read from that 
 
 | | |
 |---|---|
-| Unclosed | **1** of 3 |
-| By status | `accepted` 1 |
-| Waiting on | owner 1 |
+| Unclosed | **1** of 4 |
+| By status | `fixed` 1 |
+| Waiting on | reviewer 1 |
 
 | level | item | status | waiting on | title |
 |---|---|---|---|---|
-| **P2** | [`P2-1`](issues/P2-1.md) | `accepted` | owner | `Validatable::validate()` calls `$this->toArray()`, which comes from … |
+| **P3** | [`P3-3`](issues/P3-3.md) | `fixed` | reviewer | The README says twice that fromArray() 'binds positionally', while … |
 
 ## Verdict
 
-Two tiny traits — DataAccess and Validatable — that do exactly what they promise with zero magic. The compile-time toArray() contract is a deliberate break documented in the closure audit.
+The compile-time contract and its migration note are both in place; one internal README contradiction about how fromArray() binds was found.
 
 ## Fixed since the last round
 
-Both prior items confirmed fixed: P2-1 Validatable now declares abstract public function toArray() (compile-time break, intentional); P3-1/P3-2 metadata drift resolved.
+P2-1 verified by mutation: Validatable declares abstract toArray() at the type level, and both README halves carry the migration note the 2026-09-29 ruling asked for. Deleting the declaration turns the module’s own test red with a ReflectionException.
 
 ## Test gaps
 
-No test for Validatable with a validator that returns a non-string, non-array error shape; no test for DataAccess with a null/empty idColumn.
+DataAccess::toArray() has no test for a class with private properties; Validatable::getValidator()’s per-class cache has no reverse case where a subclass initialises before its parent.
 
 ## Verification protocol
 
@@ -71,7 +72,7 @@ No test for Validatable with a validator that returns a non-string, non-array er
 > 本模块问题的概览。条目本体在 [`issues/`](issues/README.md)，一条目一文件：前置字段加讨论串。
 > 本文件由条目生成，随时可以整段重写；请改条目，不要改本文件。
 >
-> 出自 miGears 全模块代码评审报告（5th round，2026-09-28）。
+> 出自 miGears 全模块代码评审报告（6th round，2026-10-01）。
 
 | | |
 |---|---|
@@ -84,18 +85,19 @@ No test for Validatable with a validator that returns a non-string, non-array er
 
 | | |
 |---|---|
-| 未了结 | P0 0 · P1 0 · P2 1 · P3 0 · 其他 0 |
-| 已了结 | 2 / 3 |
-| 等模块主 | `P2-1` |
+| 未了结 | P0 0 · P1 0 · P2 0 · P3 1 · 其他 0 |
+| 已了结 | 3 / 4 |
+| 等模块主 | _无_ |
 | 等协调人 | _无_ |
-| 等评审方 | _无_ |
+| 等评审方 | `P3-3` |
 | 已暂缓，不欠谁 | _无_ |
 
 | id | 级别 | 状态 | 标题 |
 |---|---|---|---|
-| [`P2-1`](issues/P2-1.md) | P2 | **accepted** | Validatable::validate() 调用 $this->toArray()，它来自 DataAccess，但 trait 只把 … |
+| [`P2-1`](issues/P2-1.md) | P2 | **verified** | Validatable::validate() 调用 $this->toArray()，它来自 DataAccess，但 trait 只把 … |
 | [`P3-1`](issues/P3-1.md) | P3 | **verified** | README 称 DataAccess「约 15 行」，而该文件 62 行（净代码约 15 行）——措辞已加限定，但仍易被读成文件总行数。 |
 | [`P3-2`](issues/P3-2.md) | P3 | **verified** | 两处注释仍与行为相反：tests/ParentValidatableUser.php:11 与 … |
+| [`P3-3`](issues/P3-3.md) | P3 | **fixed** | README 两处称 fromArray()「按位置绑定」，而 README 另一节、trait 自己的 docblock 与用例都表明是 … |
 
 ## 未关闭
 
@@ -104,25 +106,25 @@ No test for Validatable with a validator that returns a non-string, non-array er
 
 | | |
 |---|---|
-| 未关闭 | **1** / 3 |
-| 按状态 | `accepted` 1 |
-| 等在谁 | 模块主 1 |
+| 未关闭 | **1** / 4 |
+| 按状态 | `fixed` 1 |
+| 等在谁 | 评审方 1 |
 
 | 级别 | 条目 | 状态 | 等在谁 | 标题 |
 |---|---|---|---|---|
-| **P2** | [`P2-1`](issues/P2-1.md) | `accepted` | 模块主 | Validatable::validate() 调用 $this->toArray()，它来自 DataAccess，但 trait 只把 … |
+| **P3** | [`P3-3`](issues/P3-3.md) | `fixed` | 评审方 | README 两处称 fromArray()「按位置绑定」，而 README 另一节、trait 自己的 docblock 与用例都表明是 … |
 
 ## 结论
 
-两个极简 trait——DataAccess 与 Validatable——严格兑现承诺，零魔法。编译期 toArray() 契约是有意的破坏性变更，已在结案审计中记录。
+编译期契约与迁移说明都已落地；另发现 README 内部一处关于 fromArray() 绑定方式的自相矛盾。
 
 ## 本轮已修复确认
 
-Both prior items confirmed fixed: P2-1 Validatable now declares abstract public function toArray() (compile-time break, intentional); P3-1/P3-2 metadata drift resolved.
+P2-1 verified by mutation: Validatable declares abstract toArray() at the type level, and both README halves carry the migration note the 2026-09-29 ruling asked for. Deleting the declaration turns the module’s own test red with a ReflectionException.
 
 ## 测试盲区
 
-无 Validatable 搭配返回非字符串/非数组错误形态验证器的测试；无 DataAccess 使用 null/空 idColumn 的测试。
+DataAccess::toArray() 对含私有属性的类无用例；Validatable::getValidator() 的按类缓存无「子类先于父类初始化」的反向用例。
 
 ## 验证方式
 
