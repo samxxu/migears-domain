@@ -16,6 +16,21 @@ Minimalist Domain layer — pure data containers with zero mapping.
 - **Field names match database columns 1:1** — no camelCase conversion
 - **No persistence logic** — Domain knows nothing about SQL or DAO
 
+## Boundaries
+
+**In scope**
+
+- The `DataAccess` trait: `fromArray()` (array → Domain) and `toArray()` (Domain → array), binding column names to properties 1:1 with no camelCase conversion (PSR-4 root `MiGears\Domain`).
+- The `Validatable` trait: per-class rules via `validationRules()`, `validate()` / `isValid()` / `validateArray()` / `isValidArray()`, and per-class `customValidators()`.
+- Domain objects as plain `public readonly` data carriers, plus the recommended static lazy-relation accessor pattern (`setItemLoader()`), which keeps the Domain free of DAO/Manager references.
+
+**Not in scope (by design)**
+
+- Persistence: the Domain knows nothing about SQL or DAO — generating statements belongs to `migears/sql`, executing them and converting rows belongs to `migears/dao`.
+- The validation rule set itself: `Validatable` only declares rules and delegates to the shared `Validator`; the built-in validators and rule execution belong to `migears/validator`, and turning the returned error codes into text belongs to `migears/i18n`.
+- Hydration, mapping and scalar conversion: there is no hydrator/mapper and no casting layer; PDO (PHP 8.1+) already delivers native `int`/`float`/`string`/`null`, so `fromArray()` binds positionally only.
+- Wiring the lazy loader: calling `setItemLoader()` from a Manager constructor is `migears/manager`'s job — there is no lifecycle hook here.
+
 ## Installation
 
 ```bash
@@ -249,6 +264,16 @@ Domain objects can validate their own data using the `Validatable` trait. Valida
 
 Depends on `migears/validator`.
 
+> **Migrating — `Validatable` requires `toArray()`.** The trait declares
+> `toArray(): array` abstract, because `validate()` and `isValid()` read the
+> instance through it. A class that uses `Validatable` must therefore supply
+> `toArray()` — either through `DataAccess`, as below, or by implementing it
+> itself. This is a deliberate breaking change: a class that used `Validatable`
+> without a `toArray()` of its own used to load, and failed with `Call to
+> undefined method ...::toArray()` only when `validate()` first ran; a class that
+> used only the static `validateArray()` / `isValidArray()` never failed at all.
+> Both now fail at class declaration.
+
 ```php
 use MiGears\Domain\DataAccess;
 use MiGears\Domain\Validatable;
@@ -376,6 +401,21 @@ MIT
 - **不用基类继承** — 使用 `DataAccess` trait
 - **字段名与数据库列名完全一致** — 不做驼峰/下划线互转
 - **不含持久化逻辑** — Domain 不知道 SQL 和 DAO 的存在
+
+## 边界
+
+**范围内**
+
+- `DataAccess` trait：`fromArray()`（数组 → Domain）与 `toArray()`（Domain → 数组），列名与属性名 1:1 绑定、不做驼峰转换；PSR-4 根为 `MiGears\Domain`。
+- `Validatable` trait：按类声明规则（`validationRules()`）、`validate()` / `isValid()` / `validateArray()` / `isValidArray()`，以及按类的 `customValidators()`。
+- Domain 对象作为纯 `public readonly` 数据载体，以及推荐的静态懒加载关联访问器模式（`setItemLoader()`），让 Domain 不持有 DAO/Manager 引用。
+
+**范围外（刻意不做）**
+
+- 持久化：Domain 不知道 SQL 和 DAO 的存在 —— 生成语句属于 `migears/sql`，执行语句与转换结果行属于 `migears/dao`。
+- 验证规则集合本身：`Validatable` 只声明规则并委托给共享的 `Validator`；内置验证器与规则执行属于 `migears/validator`，把返回的错误码翻译成文案属于 `migears/i18n`。
+- Hydration、映射与标量转换：本包没有 hydrator/mapper，也没有强制转换层；PDO（PHP 8.1+）已给出原生 `int`/`float`/`string`/`null`，`fromArray()` 只按位绑定。
+- 懒加载的 wiring：在 Manager 构造函数里调用 `setItemLoader()` 是 `migears/manager` 的职责 —— 这里没有生命周期钩子。
 
 ## 安装
 
@@ -594,6 +634,13 @@ SQL       → ERROR: table orders has no column named itemsLoader
 Domain 对象可以使用 `Validatable` trait 自验证数据。验证规则定义在 domain 类自身，错误以结构化的错误码 + 参数形式返回（i18n 就绪）。
 
 依赖 `migears/validator`。
+
+> **迁移提示 — `Validatable` 要求 `toArray()`。** 该 trait 将 `toArray(): array`
+> 声明为 abstract，因为 `validate()` 与 `isValid()` 通过它读取实例状态。因此使用
+> `Validatable` 的类必须提供 `toArray()` —— 或用 `DataAccess`（见下例），或自行实现。
+> 这是有意的破坏性变更：过去不带自身 `toArray()` 而使用 `Validatable` 的类可以加载，
+> 只在首次运行 `validate()` 时才抛 `Call to undefined method ...::toArray()`；而只用静态
+> `validateArray()` / `isValidArray()` 的类则完全不会失败。现在两者都在类声明处失败。
 
 ```php
 use MiGears\Domain\DataAccess;
