@@ -28,7 +28,7 @@ Minimalist Domain layer — pure data containers with zero mapping.
 
 - Persistence: the Domain knows nothing about SQL or DAO — generating statements belongs to `migears/sql`, executing them and converting rows belongs to `migears/dao`.
 - The validation rule set itself: `Validatable` only declares rules and delegates to the shared `Validator`; the built-in validators and rule execution belong to `migears/validator`, and turning the returned error codes into text belongs to `migears/i18n`.
-- Hydration, mapping and scalar conversion: there is no hydrator/mapper and no casting layer; PDO (PHP 8.1+) already delivers native `int`/`float`/`string`/`null`, so `fromArray()` binds positionally only.
+- Hydration, mapping and scalar conversion: there is no hydrator/mapper and no casting layer; PDO (PHP 8.1+) already delivers native `int`/`float`/`string`/`null`, so `fromArray()` binds by parameter name only.
 - Wiring the lazy loader: calling `setItemLoader()` from a Manager constructor is `migears/manager`'s job — there is no lifecycle hook here.
 
 ## Installation
@@ -109,7 +109,7 @@ driver. The value chain is therefore:
 ```
 PDO (PHP 8.1+) → native PHP types (int, float, string, null)
                    ↓
-  Domain::fromArray() only binds them positionally (no hydration, no casting)
+  Domain::fromArray() only binds the row by parameter name (no hydration, no casting)
 ```
 
 This is why neither the Domain nor the DAO needs a hydrator or scalar-conversion
@@ -414,7 +414,7 @@ MIT
 
 - 持久化：Domain 不知道 SQL 和 DAO 的存在 —— 生成语句属于 `migears/sql`，执行语句与转换结果行属于 `migears/dao`。
 - 验证规则集合本身：`Validatable` 只声明规则并委托给共享的 `Validator`；内置验证器与规则执行属于 `migears/validator`，把返回的错误码翻译成文案属于 `migears/i18n`。
-- Hydration、映射与标量转换：本包没有 hydrator/mapper，也没有强制转换层；PDO（PHP 8.1+）已给出原生 `int`/`float`/`string`/`null`，`fromArray()` 只按位绑定。
+- Hydration、映射与标量转换：本包没有 hydrator/mapper，也没有强制转换层；PDO（PHP 8.1+）已给出原生 `int`/`float`/`string`/`null`，`fromArray()` 只按参数名绑定。
 - 懒加载的 wiring：在 Manager 构造函数里调用 `setItemLoader()` 是 `migears/manager` 的职责 —— 这里没有生命周期钩子。
 
 ## 安装
@@ -493,7 +493,7 @@ $back = $domain->toArray();
 ```
 PDO（PHP 8.1+）→ 原生 PHP 类型（int、float、string、null）
              ↓
-  Domain::fromArray() 仅按位绑定（不 hydration、不强制转换）
+  Domain::fromArray() 仅按参数名绑定（不 hydration、不强制转换）
 ```
 
 这正是为什么 Domain 与 DAO 都不需要 hydrator 和标量转换逻辑。
