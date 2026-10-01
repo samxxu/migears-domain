@@ -17,18 +17,18 @@ Legend — **P0** functional or security · **P1** documentation that fails when
 
 | | |
 |---|---|
-| Unsettled | P0 0 · P1 0 · P2 1 · P3 2 · other 0 |
-| Settled | 0 of 3 |
-| Waiting on the owner | `P2-1`, `P3-1`, `P3-2` |
-| Waiting on the reviewer | _nothing_ |
+| Unsettled | P0 0 · P1 0 · P2 1 · P3 0 · other 0 |
+| Settled | 2 of 3 |
+| Waiting on the owner | `P2-1` |
 | Waiting on the coordinator | _nothing_ |
+| Waiting on the reviewer | _nothing_ |
 | Deferred, owing nobody | _nothing_ |
 
 | id | level | status | title |
 |---|---|---|---|
-| [`P2-1`](issues/P2-1.md) | P2 | **open** | `Validatable::validate()` calls `$this->toArray()`, which comes from … |
-| [`P3-1`](issues/P3-1.md) | P3 | **open** | The README describes `DataAccess` as 'about 15 lines' while the file is … |
-| [`P3-2`](issues/P3-2.md) | P3 | **open** | Two comments still describe the opposite behaviour: … |
+| [`P2-1`](issues/P2-1.md) | P2 | **accepted** | `Validatable::validate()` calls `$this->toArray()`, which comes from … |
+| [`P3-1`](issues/P3-1.md) | P3 | **verified** | The README describes `DataAccess` as 'about 15 lines' while the file is … |
+| [`P3-2`](issues/P3-2.md) | P3 | **verified** | Two comments still describe the opposite behaviour: … |
 
 ## Unclosed
 
@@ -37,15 +37,13 @@ highest severity first. `waiting on` is the party who acts next, read from that 
 
 | | |
 |---|---|
-| Unclosed | **3** of 3 |
-| By status | `open` 3 |
-| Waiting on | owner 3 |
+| Unclosed | **1** of 3 |
+| By status | `accepted` 1 |
+| Waiting on | owner 1 |
 
 | level | item | status | waiting on | title |
 |---|---|---|---|---|
-| **P2** | [`P2-1`](issues/P2-1.md) | `open` | owner | `Validatable::validate()` calls `$this->toArray()`, which comes from … |
-| **P3** | [`P3-1`](issues/P3-1.md) | `open` | owner | The README describes `DataAccess` as 'about 15 lines' while the file is … |
-| **P3** | [`P3-2`](issues/P3-2.md) | `open` | owner | Two comments still describe the opposite behaviour: … |
+| **P2** | [`P2-1`](issues/P2-1.md) | `accepted` | owner | `Validatable::validate()` calls `$this->toArray()`, which comes from … |
 
 ## Verdict
 
@@ -86,18 +84,18 @@ No test for Validatable with a validator that returns a non-string, non-array er
 
 | | |
 |---|---|
-| 未了结 | P0 0 · P1 0 · P2 1 · P3 2 · 其他 0 |
-| 已了结 | 0 / 3 |
-| 等负责人 | `P2-1`, `P3-1`, `P3-2` |
-| 等评审方 | _无_ |
+| 未了结 | P0 0 · P1 0 · P2 1 · P3 0 · 其他 0 |
+| 已了结 | 2 / 3 |
+| 等模块主 | `P2-1` |
 | 等协调人 | _无_ |
+| 等评审方 | _无_ |
 | 已暂缓，不欠谁 | _无_ |
 
 | id | 级别 | 状态 | 标题 |
 |---|---|---|---|
-| [`P2-1`](issues/P2-1.md) | P2 | **open** | Validatable::validate() 调用 $this->toArray()，它来自 DataAccess，但 trait 只把 … |
-| [`P3-1`](issues/P3-1.md) | P3 | **open** | README 称 DataAccess「约 15 行」，而该文件 62 行（净代码约 15 行）——措辞已加限定，但仍易被读成文件总行数。 |
-| [`P3-2`](issues/P3-2.md) | P3 | **open** | 两处注释仍与行为相反：tests/ParentValidatableUser.php:11 与 … |
+| [`P2-1`](issues/P2-1.md) | P2 | **accepted** | Validatable::validate() 调用 $this->toArray()，它来自 DataAccess，但 trait 只把 … |
+| [`P3-1`](issues/P3-1.md) | P3 | **verified** | README 称 DataAccess「约 15 行」，而该文件 62 行（净代码约 15 行）——措辞已加限定，但仍易被读成文件总行数。 |
+| [`P3-2`](issues/P3-2.md) | P3 | **verified** | 两处注释仍与行为相反：tests/ParentValidatableUser.php:11 与 … |
 
 ## 未关闭
 
@@ -106,15 +104,13 @@ No test for Validatable with a validator that returns a non-string, non-array er
 
 | | |
 |---|---|
-| 未关闭 | **3** / 3 |
-| 按状态 | `open` 3 |
-| 等在谁 | 负责人 3 |
+| 未关闭 | **1** / 3 |
+| 按状态 | `accepted` 1 |
+| 等在谁 | 模块主 1 |
 
 | 级别 | 条目 | 状态 | 等在谁 | 标题 |
 |---|---|---|---|---|
-| **P2** | [`P2-1`](issues/P2-1.md) | `open` | 负责人 | Validatable::validate() 调用 $this->toArray()，它来自 DataAccess，但 trait 只把 … |
-| **P3** | [`P3-1`](issues/P3-1.md) | `open` | 负责人 | README 称 DataAccess「约 15 行」，而该文件 62 行（净代码约 15 行）——措辞已加限定，但仍易被读成文件总行数。 |
-| **P3** | [`P3-2`](issues/P3-2.md) | `open` | 负责人 | 两处注释仍与行为相反：tests/ParentValidatableUser.php:11 与 … |
+| **P2** | [`P2-1`](issues/P2-1.md) | `accepted` | 模块主 | Validatable::validate() 调用 $this->toArray()，它来自 DataAccess，但 trait 只把 … |
 
 ## 结论
 
