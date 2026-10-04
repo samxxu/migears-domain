@@ -7,7 +7,8 @@ namespace MiGears\Domain\Tests;
 use MiGears\Domain\Validatable;
 
 /**
- * Domain fixture that declares a custom validator via customValidators().
+ * Domain fixture whose `evenNumber` rule is registered (by class-string) in a
+ * test via Validatable::register() rather than declared on the class.
  */
 final class EvenUser
 {
@@ -18,11 +19,6 @@ final class EvenUser
     protected static function validationRules(): array
     {
         return ['value' => ['evenNumber' => true]];
-    }
-
-    protected static function customValidators(): array
-    {
-        return [EvenNumberValidator::class];
     }
 
     /**

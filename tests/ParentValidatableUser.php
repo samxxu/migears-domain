@@ -7,10 +7,9 @@ namespace MiGears\Domain\Tests;
 use MiGears\Domain\Validatable;
 
 /**
- * Inheritable fixture with a built-in rule only. Used to prove that a child
- * class's customValidators() is honoured even when the parent has already
- * initialised its own Validator: instances are cached per static::class, so the
- * child gets its own rather than sharing the parent's.
+ * Parent fixture that references the custom `evenNumber` rule, registered by the
+ * test rather than declared on the class. Used to prove a registration is scoped
+ * to the class it was made on.
  */
 class ParentValidatableUser
 {
@@ -20,7 +19,7 @@ class ParentValidatableUser
 
     protected static function validationRules(): array
     {
-        return ['value' => ['integer' => true]];
+        return ['value' => ['evenNumber' => true]];
     }
 
     /**

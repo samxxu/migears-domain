@@ -7,8 +7,8 @@ namespace MiGears\Domain\Tests;
 use MiGears\Domain\Validatable;
 
 /**
- * Domain fixture that references a custom rule WITHOUT declaring the custom
- * validator, used to prove customValidators() does not leak across classes.
+ * Domain fixture that references the custom `evenNumber` rule WITHOUT anyone
+ * registering it, used to prove an unregistered alias is unknown to the class.
  */
 final class UnknownRuleUser
 {

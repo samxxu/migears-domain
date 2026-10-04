@@ -21,15 +21,15 @@ Minimalist Domain layer — pure data containers with zero mapping.
 **In scope**
 
 - The `DataAccess` trait: `fromArray()` (array → Domain) and `toArray()` (Domain → array), binding column names to properties 1:1 with no camelCase conversion (PSR-4 root `MiGears\Domain`).
-- The `Validatable` trait: per-class rules via `validationRules()`, `validate()` / `isValid()` / `validateArray()` / `isValidArray()`, and per-class `customValidators()`.
+- The `Validatable` trait: per-class rules via `validationRules()`, `validate()` / `isValid()` / `validateArray()` / `isValidArray()`, and a per-class `register()` for custom rules (class-strings or injected instances).
 - Domain objects as plain `public readonly` data carriers, plus the recommended static lazy-relation accessor pattern (`setItemLoader()`), which keeps the Domain free of DAO/Manager references.
 
 **Not in scope (by design)**
 
 - Persistence: the Domain knows nothing about SQL or DAO — generating statements belongs to `migears/sql`, executing them and converting rows belongs to `migears/dao`.
-- The validation rule set itself: `Validatable` only declares rules and delegates to the shared `Validator`; the built-in validators and rule execution belong to `migears/validator`, and turning the returned error codes into text belongs to `migears/i18n`.
+- The validation rule set itself: `Validatable` only declares rules and delegates to the shared `Validator`; the built-in rules and rule execution belong to `migears/validator`, and turning the returned error codes into text belongs to `migears/i18n`.
 - Hydration, mapping and scalar conversion: there is no hydrator/mapper and no casting layer; PDO (PHP 8.1+) already delivers native `int`/`float`/`string`/`null`, so `fromArray()` binds by parameter name only.
-- Wiring the lazy loader: calling `setItemLoader()` from a Manager constructor is `migears/manager`'s job — there is no lifecycle hook here.
+- Wiring the lazy loader and injected validation rules: calling `setItemLoader()` / `register()` from a Manager constructor is `migears/manager`'s job — there is no lifecycle hook here.
 
 ## Installation
 
@@ -264,15 +264,10 @@ Domain objects can validate their own data using the `Validatable` trait. Valida
 
 Depends on `migears/validator`.
 
-> **Migrating — `Validatable` requires `toArray()`.** The trait declares
-> `toArray(): array` abstract, because `validate()` and `isValid()` read the
-> instance through it. A class that uses `Validatable` must therefore supply
-> `toArray()` — either through `DataAccess`, as below, or by implementing it
-> itself. This is a deliberate breaking change: a class that used `Validatable`
-> without a `toArray()` of its own used to load, and failed with `Call to
-> undefined method ...::toArray()` only when `validate()` first ran; a class that
-> used only the static `validateArray()` / `isValidArray()` never failed at all.
-> Both now fail at class declaration.
+`Validatable` declares `toArray(): array` abstract, because `validate()` and
+`isValid()` read the instance through it. A class using `Validatable` must
+therefore supply `toArray()` — through `DataAccess`, as below, or by implementing
+it itself.
 
 ```php
 use MiGears\Domain\DataAccess;
@@ -317,6 +312,11 @@ $user->isValid(); // false
 
 ### Validate before construction
 
+Raw input such as `$_POST` is all strings, and `fromArray()` refuses to coerce
+(see Type Contract), so it cannot build a domain that declares a non-string field
+— `int $age` handed `'25'` throws a `TypeError`. Validate the array first, then
+construct:
+
 ```php
 $errors = UserDomain::validateArray($_POST);
 
@@ -327,34 +327,117 @@ if ($errors === []) {
 
 ### Custom validation rules
 
-Rules that are not part of the built-in set can be added by overriding `customValidators()`. Each entry is a validator class-string (the rule alias is derived from the class name); the domain class's shared validator is pre-registered with these on first use, scoped to that class only.
+A custom rule is registered with `register()`, in one of two forms.
+
+**By class-string — the normal form.** The alias is derived from the class name,
+and the engine builds the rule from the field's config in `validationRules()`. A
+rule's parameters therefore belong in the rules table, not at the registration:
 
 ```php
-use MiGears\Validator\ValidatorInterface;
+use MiGears\Validator\RuleInterface;
 
-final class StrongPasswordValidator implements ValidatorInterface
+final class StrengthRule implements RuleInterface
 {
-    public function validate(mixed $value): bool { /* ... */ }
-    public function getErrorCode(): string { return 'strongPassword'; }
+    public function __construct(private int $min = 8) {}
+    public function validate(mixed $value): bool
+    {
+        return is_string($value) && strlen($value) >= $this->min;
+    }
+    public function getErrorCode(): string { return 'strength'; }
+    public function getErrorParams(): array { return ['min' => $this->min]; }
+}
+
+UserDomain::register(StrengthRule::class);
+
+// in validationRules():
+'password' => ['strength' => 12],   // → new StrengthRule(12)
+'pin'      => ['strength' => 4],    // → new StrengthRule(4)
+```
+
+One class, a different parameter per field. Registration is per class, so a rule
+registered on one domain class never leaks into another. `register()` returns true
+when the alias displaced a rule that was already reachable (another registration
+or a built-in).
+
+**By instance** is the second form, covered next: it is only for a rule that needs
+a dependency the Domain must not hold — never for passing parameters.
+
+### Rules that need a dependency
+
+A rule that must reach outside the object — a uniqueness check that queries the
+database, say — cannot be registered as a class-string: the Validator builds those
+itself, with no dependency to hand. Register such a rule as an **instance**
+instead, from the Manager that already owns the DAO. The instance's alias is its
+own `getErrorCode()`, which is the same name `validationRules()` references. This
+mirrors the lazy-relation `setItemLoader()` pattern: the Domain declares the
+alias, the Manager supplies the implementation once, from its constructor.
+
+```php
+use Closure;
+use MiGears\Validator\RuleInterface;
+
+final class UniqueEmailRule implements RuleInterface
+{
+    /** @param Closure(string): bool $emailExists */
+    public function __construct(private Closure $emailExists) {}
+
+    public function validate(mixed $value): bool
+    {
+        return $value === null || $value === ''
+            || !($this->emailExists)((string) $value);
+    }
+
+    public function getErrorCode(): string { return 'uniqueEmail'; }
     public function getErrorParams(): array { return []; }
 }
 
-class UserDomain
+final class UserManager
 {
-    use DataAccess;
-    use Validatable;
-
-    // ...constructor & validationRules()...
-
-    protected static function customValidators(): array
+    public function __construct(private UserDao $dao)
     {
-        return [StrongPasswordValidator::class];
-        // `strongPassword` is now available in validationRules()
+        UserDomain::register(
+            new UniqueEmailRule(fn (string $email) => $this->dao->existsByEmail($email))
+        );
     }
 }
 ```
 
-Custom rules registered for one domain class never leak into others.
+`validationRules()` then references the alias like any other rule:
+
+```php
+'email' => ['required' => true, 'email' => true, 'uniqueEmail' => true],
+```
+
+The instance form carries a **dependency, not parameters**: the instance is already
+built, so any config written for its alias in `validationRules()` is ignored.
+Registering makes the alias *available*, it does not force it — the rule runs only
+on fields whose `validationRules()` reference it, and a rule the declaration
+disabled with `false` stays disabled. Re-registering an alias replaces the rule,
+and registration is per class, so an injected rule never leaks into another Domain.
+
+### Where the Validator lives
+
+Each domain class keeps its own `Validator`, keyed by class name and reused
+across calls. That per-class storage is load-bearing, not just a cache:
+
+- **Scoping.** A rule registered on one class stays with that class — it never
+  reaches a sibling, nor leaks from a parent into its children through the trait's
+  shared storage.
+- **Caching and persistence.** The Validator is built once per class, and it is
+  what a registration is written into: a throwaway instance would lose every
+  registered rule.
+
+Two simpler shapes do not work:
+
+- **One shared Validator.** Every class would see every other class's registered
+  rules, and a parent's registrations would leak into its children.
+- **An instance property holding it.** `toArray()` is `get_object_vars($this)`,
+  so the stored Validator would be handed to the DAO as a column
+  (`table users has no column named validator`) — the same trap the
+  lazy-relation loader avoids by living in a static slot.
+
+So the storage has to be static and per class — which is exactly what a trait
+static property keyed by `static::class` provides.
 
 ### Error format
 
@@ -407,7 +490,7 @@ MIT
 **范围内**
 
 - `DataAccess` trait：`fromArray()`（数组 → Domain）与 `toArray()`（Domain → 数组），列名与属性名 1:1 绑定、不做驼峰转换；PSR-4 根为 `MiGears\Domain`。
-- `Validatable` trait：按类声明规则（`validationRules()`）、`validate()` / `isValid()` / `validateArray()` / `isValidArray()`，以及按类的 `customValidators()`。
+- `Validatable` trait：按类声明规则（`validationRules()`）、`validate()` / `isValid()` / `validateArray()` / `isValidArray()`，以及按类的 `register()` 用于注册自定义规则（类名或注入的实例）。
 - Domain 对象作为纯 `public readonly` 数据载体，以及推荐的静态懒加载关联访问器模式（`setItemLoader()`），让 Domain 不持有 DAO/Manager 引用。
 
 **范围外（刻意不做）**
@@ -415,7 +498,7 @@ MIT
 - 持久化：Domain 不知道 SQL 和 DAO 的存在 —— 生成语句属于 `migears/sql`，执行语句与转换结果行属于 `migears/dao`。
 - 验证规则集合本身：`Validatable` 只声明规则并委托给共享的 `Validator`；内置验证器与规则执行属于 `migears/validator`，把返回的错误码翻译成文案属于 `migears/i18n`。
 - Hydration、映射与标量转换：本包没有 hydrator/mapper，也没有强制转换层；PDO（PHP 8.1+）已给出原生 `int`/`float`/`string`/`null`，`fromArray()` 只按参数名绑定。
-- 懒加载的 wiring：在 Manager 构造函数里调用 `setItemLoader()` 是 `migears/manager` 的职责 —— 这里没有生命周期钩子。
+- 懒加载与注入式验证规则的 wiring：在 Manager 构造函数里调用 `setItemLoader()` / `register()` 是 `migears/manager` 的职责 —— 这里没有生命周期钩子。
 
 ## 安装
 
@@ -635,12 +718,9 @@ Domain 对象可以使用 `Validatable` trait 自验证数据。验证规则定�
 
 依赖 `migears/validator`。
 
-> **迁移提示 — `Validatable` 要求 `toArray()`。** 该 trait 将 `toArray(): array`
-> 声明为 abstract，因为 `validate()` 与 `isValid()` 通过它读取实例状态。因此使用
-> `Validatable` 的类必须提供 `toArray()` —— 或用 `DataAccess`（见下例），或自行实现。
-> 这是有意的破坏性变更：过去不带自身 `toArray()` 而使用 `Validatable` 的类可以加载，
-> 只在首次运行 `validate()` 时才抛 `Call to undefined method ...::toArray()`；而只用静态
-> `validateArray()` / `isValidArray()` 的类则完全不会失败。现在两者都在类声明处失败。
+`Validatable` 把 `toArray(): array` 声明为 abstract，因为 `validate()` 与 `isValid()`
+通过它读取实例状态。因此使用 `Validatable` 的类必须提供 `toArray()` —— 或用 `DataAccess`
+（见下例），或自行实现。
 
 ```php
 use MiGears\Domain\DataAccess;
@@ -685,6 +765,10 @@ $user->isValid(); // false
 
 ### 构造前验证
 
+`$_POST` 这类原始输入全是字符串，而 `fromArray()` 拒绝类型转换（见「类型契约」），
+因此它无法构造声明了非字符串字段的 domain —— `int $age` 遇到 `'25'` 会抛 `TypeError`。
+先校验数组，再构造：
+
 ```php
 $errors = UserDomain::validateArray($_POST);
 
@@ -695,34 +779,104 @@ if ($errors === []) {
 
 ### 自定义验证规则
 
-不在内置集合里的规则，可通过覆盖 `customValidators()` 添加。每个条目是一个验证器类名（规则别名由类名推导）；domain 类在首次使用时把自定义规则预注册到共享的验证器实例上，且仅作用于本类。
+自定义规则用 `register()` 注册，有两种形态。
+
+**传类名 —— 常规形态。** 别名由类名推导，引擎依据 `validationRules()` 里该字段的配置来构造规则。
+因此规则的**参数写在规则表里**，不在注册处：
 
 ```php
-use MiGears\Validator\ValidatorInterface;
+use MiGears\Validator\RuleInterface;
 
-final class StrongPasswordValidator implements ValidatorInterface
+final class StrengthRule implements RuleInterface
 {
-    public function validate(mixed $value): bool { /* ... */ }
-    public function getErrorCode(): string { return 'strongPassword'; }
+    public function __construct(private int $min = 8) {}
+    public function validate(mixed $value): bool
+    {
+        return is_string($value) && strlen($value) >= $this->min;
+    }
+    public function getErrorCode(): string { return 'strength'; }
+    public function getErrorParams(): array { return ['min' => $this->min]; }
+}
+
+UserDomain::register(StrengthRule::class);
+
+// validationRules() 里：
+'password' => ['strength' => 12],   // → new StrengthRule(12)
+'pin'      => ['strength' => 4],    // → new StrengthRule(4)
+```
+
+同一个类，按字段给不同参数。注册按类隔离，在一个 domain 类上注册的规则不会泄漏到另一个类。
+当别名挤掉了已可达的规则（另一次注册或某个内置规则）时，`register()` 返回 true。
+
+**传实例**是第二种形态，见下一节：它只用于「规则需要 Domain 不该持有的依赖」，绝不用于传参。
+
+### 需要依赖的规则
+
+有些规则必须访问对象之外的东西 —— 例如查库判断唯一性 —— 它们不能按类名注册：那些类由
+Validator 自己构造，拿不到任何依赖。这类规则应以**实例**形式注册，由已经持有 DAO 的
+Manager 来做。实例的别名取自它自己的 `getErrorCode()`，正是 `validationRules()` 引用的那个
+名字。这与关联数据的 `setItemLoader()` 范式一致：Domain 只声明别名，Manager 在构造函数里
+一次性提供实现。
+
+```php
+use Closure;
+use MiGears\Validator\RuleInterface;
+
+final class UniqueEmailRule implements RuleInterface
+{
+    /** @param Closure(string): bool $emailExists */
+    public function __construct(private Closure $emailExists) {}
+
+    public function validate(mixed $value): bool
+    {
+        return $value === null || $value === ''
+            || !($this->emailExists)((string) $value);
+    }
+
+    public function getErrorCode(): string { return 'uniqueEmail'; }
     public function getErrorParams(): array { return []; }
 }
 
-class UserDomain
+final class UserManager
 {
-    use DataAccess;
-    use Validatable;
-
-    // ...构造器与 validationRules()...
-
-    protected static function customValidators(): array
+    public function __construct(private UserDao $dao)
     {
-        return [StrongPasswordValidator::class];
-        // `strongPassword` 现在可以在 validationRules() 中使用
+        UserDomain::register(
+            new UniqueEmailRule(fn (string $email) => $this->dao->existsByEmail($email))
+        );
     }
 }
 ```
 
-为一个 domain 类注册的自定义规则不会泄漏到其它类。
+之后 `validationRules()` 像引用普通规则一样引用该别名：
+
+```php
+'email' => ['required' => true, 'email' => true, 'uniqueEmail' => true],
+```
+
+实例形态携带的是**依赖，不是参数**：实例已经构造完成，所以 `validationRules()` 里为它写的配置会被忽略。
+注册只是让别名**可用**，不是强制启用 —— 只有 `validationRules()` 引用了它的字段才会执行，
+被声明用 `false` 关闭的规则保持关闭。对同一别名重复注册会替换规则，注册按类隔离，
+注入的规则不会泄漏到其它 Domain。
+
+### Validator 存在哪里
+
+每个 domain 类各持一个 `Validator`，以类名为键、跨调用复用。这个按类存储是承重的，
+不只是缓存：
+
+- **作用域。** 一个类注册的规则只属于该类 —— 不会到达兄弟类，也不会经由 trait 的共享存储
+  从父类泄漏到子类。
+- **缓存与持久化。** Validator 每类只构造一次，而注册正是写进它里面：换成用完即丢的实例
+  会丢掉每一条注册的规则。
+
+两种更简单的形态都不成立：
+
+- **单一共享 Validator。** 每个类都会看见其它所有类注册的规则，父类的注册也会泄漏到子类。
+- **用实例属性保存它。** `toArray()` 是 `get_object_vars($this)`，存下来的 Validator 会被
+  当作一列交给 DAO（`table users has no column named validator`）—— 与懒加载 loader 靠
+  静态槽位规避的是同一个坑。
+
+所以存储必须既是静态、又按类 —— 而以 `static::class` 为键的 trait 静态属性正好如此。
 
 ### 错误格式
 

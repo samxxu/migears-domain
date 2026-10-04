@@ -5,21 +5,11 @@ declare(strict_types=1);
 namespace MiGears\Domain\Tests;
 
 /**
- * Child domain that extends the parent and adds a custom rule via
- * customValidators() without reusing the Validatable trait directly.
- * Validator instances are cached per class (keyed by static::class), so this
- * child gets its own instance: its custom rule must be honoured even when the
- * parent has already initialised its own Validator.
+ * Child that inherits ParentValidatableUser's validationRules() (referencing
+ * `evenNumber`) and toArray(), but declares nothing of its own. Used to prove a
+ * rule registered on the parent does not reach the child, and that the child can
+ * register the rule for itself.
  */
 final class ChildValidatableUser extends ParentValidatableUser
 {
-    protected static function validationRules(): array
-    {
-        return ['value' => ['integer' => true, 'evenNumber' => true]];
-    }
-
-    protected static function customValidators(): array
-    {
-        return [EvenNumberValidator::class];
-    }
 }

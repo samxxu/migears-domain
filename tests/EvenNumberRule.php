@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace MiGears\Domain\Tests;
 
-use MiGears\Validator\ValidatorInterface;
+use MiGears\Validator\RuleInterface;
 
 /**
- * Custom validator used to exercise Validatable::customValidators().
+ * Custom rule used to exercise Validatable::register().
  * Rule alias derived from class name: evenNumber.
  */
-final class EvenNumberValidator implements ValidatorInterface
+final class EvenNumberRule implements RuleInterface
 {
     public function validate(mixed $value): bool
     {

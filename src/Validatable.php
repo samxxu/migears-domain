@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MiGears\Domain;
 
+use MiGears\Validator\RuleInterface;
 use MiGears\Validator\Validator;
 
 /**
@@ -21,6 +22,24 @@ use MiGears\Validator\Validator;
  * either by using the `DataAccess` trait or by implementing it itself. The
  * static `validateArray()` / `isValidArray()` methods still read an array
  * directly, but the class they belong to has to satisfy the same contract.
+ *
+ * Custom rules are registered per class through `register()`, in one of two
+ * forms:
+ *
+ *  - a rule class-string — the normal form. The engine builds the rule from the
+ *    field's config in `validationRules()`, so the rule's parameters belong in
+ *    the rules table, never at the registration:
+ *        UserDomain::register(StrengthRule::class);
+ *        // 'password' => ['strength' => 12]  →  new StrengthRule(12)
+ *
+ *  - a ready-made instance — the escape hatch, only for a rule that needs a
+ *    dependency the Domain must not hold (a DAO-backed uniqueness rule, say).
+ *    Its alias is its own getErrorCode(), and a Manager registers it once from
+ *    its constructor, mirroring the lazy-relation `setItemLoader()` pattern:
+ *        UserDomain::register(new UniqueEmailRule($this->dao));
+ *
+ * Never use the instance form to carry parameters: it is already built, so the
+ * config written for it in `validationRules()` is ignored.
  *
  * Usage:
  *   use MiGears\Domain\DataAccess;
@@ -53,13 +72,26 @@ use MiGears\Validator\Validator;
 trait Validatable
 {
     /**
-     * Validator instances keyed by class name.
+     * Per-class Validator instances, keyed by class name.
      *
-     * Trait static properties are copied only to the class that uses the trait
-     * and are shared by its subclasses. Keeping a per-class map (instead of a
-     * single cached instance) guarantees each concrete class gets its own
-     * Validator seeded with its own customValidators(), even when the parent
-     * initialises first.
+     * A trait static property belongs to the class that uses the trait and is
+     * shared by its subclasses, so this single map serves the whole hierarchy.
+     * It is keyed by static::class for two reasons, neither optional:
+     *
+     *  1. Scoping — a rule a class registers stays with that class; it never
+     *     reaches a sibling, nor leaks from a parent into its children.
+     *  2. Caching and persistence — the Validator is built once per class,
+     *     and it is the thing a registration is written into: a throwaway
+     *     instance would lose every registered rule.
+     *
+     * The two simpler shapes both fail. A single shared instance would leak every
+     * class's rules into every other. An instance property cannot be used at all:
+     * toArray() is get_object_vars($this), so a stored Validator would be handed
+     * to the DAO as a column — the same trap the lazy-relation loader avoids by
+     * living in a static slot. Static, per-class storage is the only shape that
+     * satisfies both.
+     *
+     * @var array<class-string, Validator>
      */
     private static array $validatorInstances = [];
 
@@ -86,19 +118,38 @@ trait Validatable
     abstract public function toArray(): array;
 
     /**
-     * Optional custom validators to pre-register on this domain class's
-     * shared Validator instance.
+     * Register a custom rule for this domain class.
      *
-     * Each entry is a validator class-string (e.g.
-     * `StrongPasswordValidator::class`); the rule alias is derived from the
-     * class name. Override in the domain class to add rules beyond the built-in
-     * set. Defaults to none.
+     * Two forms, for two different jobs:
      *
-     * @return list<class-string<\MiGears\Validator\ValidatorInterface>>
+     *  1. A rule class-string — the normal form. Its alias is derived from the
+     *     class name, and the engine builds the rule lazily from the field's
+     *     config in validationRules(), so the rule's parameters belong in the
+     *     rules table:
+     *
+     *       UserDomain::register(StrengthRule::class);
+     *       // 'password' => ['strength' => 12]  →  new StrengthRule(12)
+     *       // 'pin'      => ['strength' => 4]   →  new StrengthRule(4)
+     *
+     *  2. A ready-made RuleInterface instance — the escape hatch, only for a rule
+     *     that needs a dependency the Domain must not hold (e.g. a DAO-backed
+     *     uniqueness rule). Its alias is its own getErrorCode(), and a Manager
+     *     registers it once from its constructor:
+     *
+     *       UserDomain::register(new UniqueEmailRule($this->dao));
+     *
+     * Do not use form 2 to pass parameters: an instance is already built, so the
+     * config written for it in validationRules() is ignored. Either form applies
+     * only where validationRules() references the alias — registering does not by
+     * itself put the rule on any field. Re-registering an alias replaces the
+     * rule, and reports true when it displaced a rule that was already reachable
+     * (a sibling registration or a built-in).
+     *
+     * @param class-string<RuleInterface>|RuleInterface $rule
      */
-    protected static function customValidators(): array
+    public static function register(string|RuleInterface $rule): bool
     {
-        return [];
+        return self::getValidator()->register($rule);
     }
 
     /**
@@ -111,10 +162,7 @@ trait Validatable
      */
     public function validate(): array
     {
-        $data = $this->toArray();
-        $rules = static::validationRules();
-
-        return self::getValidator()->validate($data, $rules);
+        return self::getValidator()->validate($this->toArray(), static::validationRules());
     }
 
     /**
@@ -127,9 +175,7 @@ trait Validatable
      */
     public static function validateArray(array $data): array
     {
-        $rules = static::validationRules();
-
-        return self::getValidator()->validate($data, $rules);
+        return self::getValidator()->validate($data, static::validationRules());
     }
 
     /**
@@ -151,17 +197,18 @@ trait Validatable
     }
 
     /**
-     * Get the Validator instance for the calling class.
+     * Get the calling class's Validator, building and caching it on first use.
      *
-     * Keyed by static::class so subclasses do not share a parent's seeded
-     * instance within an inheritance chain.
+     * Keyed by static::class — not self::class — so a subclass inheriting this
+     * storage gets an instance of its own rather than the parent's. See the
+     * $validatorInstances docblock for why that scoping is required.
      */
     private static function getValidator(): Validator
     {
         $class = static::class;
 
         if (!isset(self::$validatorInstances[$class])) {
-            self::$validatorInstances[$class] = new Validator(static::customValidators());
+            self::$validatorInstances[$class] = new Validator();
         }
 
         return self::$validatorInstances[$class];
